@@ -1,23 +1,132 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>leafstore</title>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>leafstore — visual B+ tree</title>
+<meta name="description" content="Interactive B+ tree KV demo — insert, get, range, watch nodes split."/>
 <style>
-:root{--bg:#0d1117;--card:#161b22;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff}
-body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,sans-serif}
-main{max-width:720px;margin:0 auto;padding:48px 20px}
-h1{margin:0 0 8px;font-size:2rem}.sub{color:var(--muted);margin-bottom:24px}
-a.btn{display:inline-block;margin:6px 8px 6px 0;padding:10px 14px;border-radius:10px;text-decoration:none;border:1px solid #30363d;background:var(--card);color:var(--text)}
-a.primary{background:#238636;border-color:#238636;color:#fff;font-weight:600}
-code{background:#21262d;padding:2px 6px;border-radius:6px}
+:root{--bg:#0d1117;--card:#161b22;--panel:#0f141c;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--ok:#3fb950;--warn:#d29922;--bad:#f85149;--border:#30363d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.5}
+main{max-width:980px;margin:0 auto;padding:28px 16px 64px}
+.banner{background:linear-gradient(120deg,#161b22,#0d1117 60%,#122033);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:18px;color:var(--muted);font-size:.92rem}
+.banner strong{color:var(--text)}
+h1{margin:0 0 6px;font-size:clamp(1.5rem,3vw,2rem);letter-spacing:-.02em}
+.sub{color:var(--muted);margin:0 0 18px;max-width:70ch}
+a{color:var(--accent)} .row{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:end}
+button{appearance:none;border:1px solid var(--border);background:#21262d;color:var(--text);border-radius:8px;padding:8px 12px;font-weight:600;cursor:pointer}
+button.primary{background:#238636;border-color:#238636;color:#fff}button:hover{filter:brightness(1.08)}
+button.tab{background:transparent}button.tab.active{background:#21262d;border-color:#58a6ff;color:#58a6ff}
+input,textarea{background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 10px;font:inherit;width:100%}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0}
+.muted{color:var(--muted)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:4px;letter-spacing:.04em;text-transform:uppercase}
+.field{flex:1;min-width:110px}
+.note{font-size:.85rem;color:var(--muted);margin-top:8px}
+.panel{display:none}.panel.active{display:block}
+.bar{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+.cell{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:#21262d;border:1px solid var(--border);font-family:ui-monospace,monospace;font-size:12px}
+.cell.lo{opacity:.35}.cell.mid{outline:2px solid #58a6ff}.cell.hi{opacity:.35}.cell.found{background:#238636;border-color:#3fb950}
+.graph{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nodeb{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center}
+.nodeb.visit{border-color:#58a6ff}.nodeb.done{border-color:#3fb950}
+.lru{display:flex;gap:8px;flex-wrap:wrap}
+.lru .slot{min-width:70px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center}
+.lru .slot.mru{border-color:#58a6ff}.lru .slot.empty{opacity:.4}
+#out{background:#010409;border:1px solid var(--border);border-radius:8px;padding:10px;min-height:48px;white-space:pre-wrap}
+
+#tree{overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;min-height:220px}
+.node{display:inline-flex;flex-direction:column;align-items:center;margin:6px;vertical-align:top}
+.box{border:1px solid var(--border);background:#1c2330;border-radius:8px;padding:6px 8px;min-width:70px;text-align:center}
+.box.leaf{border-color:#3fb95088}.box.internal{border-color:#58a6ff88}
+.box .t{font-size:.65rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.keys{font-family:ui-monospace,monospace;font-size:12px;margin-top:2px}
+.children{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.flash{outline:2px solid #58a6ff;box-shadow:0 0 12px #58a6ff55}
+.kv{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
 </style></head><body><main>
-<h1>leafstore</h1>
-<p class="sub">On-disk B+ tree key-value store — fixed pages, insert/get/range.</p>
-<p>This repo is library / systems code — clone and run locally for the full experience.</p>
-<pre style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:14px;overflow:auto"><code>git clone https://github.com/SK090347/leafstore.git
-cd leafstore
-npm install && npm test</code></pre>
-<p style="margin-top:22px">
-  <a class="btn primary" href="https://github.com/SK090347/leafstore">Open on GitHub</a>
-  <a class="btn" href="https://sk090347.github.io/portfolio/">Back to portfolio</a>
-</p>
-</main></body></html>
+<div class="banner"><strong>What is this?</strong> A tiny in-browser B+ tree (order 4). Type a key/value, hit Insert — watch leaves fill and split. Get/Range walk the same structure the disk engine uses.</div>
+<h1>leafstore <span style="color:var(--accent)">· visual B+ tree</span></h1>
+<p class="sub">On-disk B+ tree KV in TypeScript — this page is a live teaching model of insert / get / range. <a href="https://github.com/SK090347/leafstore">source</a></p>
+<div class="card"><div class="kv">
+  <div class="field"><label>Key</label><input id="key" placeholder="e.g. apple" value="banana"/></div>
+  <div class="field"><label>Value</label><input id="val" placeholder="e.g. yellow" value="yellow"/></div>
+  <button class="primary" id="ins">Insert</button>
+  <button id="get">Get</button>
+  <button id="range">Range</button>
+  <button id="seed">Seed demo</button>
+  <button id="clr">Clear</button>
+</div>
+<div class="mono muted" id="msg" style="margin-top:8px">Ready — insert a few keys and watch the tree.</div></div>
+<div class="card"><div class="muted" style="margin-bottom:8px;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase">Tree</div><div id="tree"></div>
+<p class="note">Leaves hold key→value pairs in sorted order. Internals hold separator keys. When a leaf overflows (order 4 = max 3 keys), it splits and a separator bubbles up — that’s why B+ trees stay balanced for disk pages.</p></div>
+<p class="muted" style="font-size:.85rem"><a href="https://sk090347.github.io/portfolio/">← portfolio</a></p>
+<script>
+var ORDER=4, MAX=ORDER-1;
+function Node(leaf){this.leaf=leaf;this.keys=[];this.vals=[];this.kids=[];this.id=Math.random().toString(36).slice(2,7);}
+var root=new Node(true);
+function findLeaf(k){var n=root; while(!n.leaf){var i=0; while(i<n.keys.length && k>=n.keys[i]) i++; n=n.kids[i];} return n;}
+function splitChild(parent,i,full){
+  var right=new Node(full.leaf); var mid=Math.floor(MAX/2);
+  if(full.leaf){
+    right.keys=full.keys.splice(mid); right.vals=full.vals.splice(mid);
+    parent.keys.splice(i,0,right.keys[0]); parent.kids.splice(i+1,0,right);
+  } else {
+    var up=full.keys[mid];
+    right.keys=full.keys.splice(mid+1); right.kids=full.kids.splice(mid+1);
+    full.keys.splice(mid,1);
+    parent.keys.splice(i,0,up); parent.kids.splice(i+1,0,right);
+  }
+}
+function insertNonFull(n,k,v){
+  if(n.leaf){
+    var i=n.keys.findIndex(function(x){return x>=k;}); if(i<0) i=n.keys.length;
+    if(n.keys[i]===k){n.vals[i]=v;return;}
+    n.keys.splice(i,0,k); n.vals.splice(i,0,v);
+  } else {
+    var i=0; while(i<n.keys.length && k>=n.keys[i]) i++;
+    if(n.kids[i].keys.length===MAX){ splitChild(n,i,n.kids[i]); if(k>=n.keys[i]) i++; }
+    insertNonFull(n.kids[i],k,v);
+  }
+}
+function insert(k,v){
+  if(root.keys.length===MAX){var s=new Node(false); s.kids=[root]; splitChild(s,0,root); root=s;}
+  insertNonFull(root,k,v);
+}
+function get(k){var n=findLeaf(k); var i=n.keys.indexOf(k); return i<0?null:n.vals[i];}
+function range(a,b){
+  var out=[]; function walk(n){ if(n.leaf){ for(var i=0;i<n.keys.length;i++){ var k=n.keys[i]; if(k>=a&&k<b) out.push([k,n.vals[i]]); } } else n.kids.forEach(walk); }
+  walk(root); return out;
+}
+function render(flashId){
+  function nodeHtml(n){
+    var cls='box '+(n.leaf?'leaf':'internal')+(n.id===flashId?' flash':'');
+    var keys=n.leaf? n.keys.map(function(k,i){return k+'→'+n.vals[i];}).join(', ') : n.keys.join(' | ');
+    var kids=''; if(!n.leaf) kids='<div class="children">'+n.kids.map(nodeHtml).join('')+'</div>';
+    return '<div class="node"><div class="'+cls+'"><div class="t">'+(n.leaf?'LEAF':'INTERNAL')+'</div><div class="keys">'+(keys||'∅')+'</div></div>'+kids+'</div>';
+  }
+  document.getElementById('tree').innerHTML=nodeHtml(root);
+}
+function say(t,ok){var m=document.getElementById('msg'); m.style.color=ok===false?'var(--bad)':ok?'var(--ok)':'var(--muted)'; m.textContent=t;}
+document.getElementById('ins').onclick=function(){
+  var k=document.getElementById('key').value.trim(); var v=document.getElementById('val').value.trim();
+  if(!k){say('Key required',false);return;}
+  var leaf=findLeaf(k); insert(k,v); render(leaf.id);
+  say('Inserted "'+k+'" → "'+v+'". Leaves stay sorted; overflow splits (order '+ORDER+').',true);
+};
+document.getElementById('get').onclick=function(){
+  var k=document.getElementById('key').value.trim(); var v=get(k); var leaf=findLeaf(k); render(leaf.id);
+  say(v==null?'Miss: "'+k+'" not in any leaf.':'Get "'+k+'" → "'+v+'" (binary search in highlighted leaf).',v!=null);
+};
+document.getElementById('range').onclick=function(){
+  var a=document.getElementById('key').value.trim()||'a';
+  var b=document.getElementById('val').value.trim()||'zzzz';
+  var pairs=range(a,b); render();
+  say('Range ['+a+', '+b+') → '+pairs.length+' keys: '+(pairs.map(function(p){return p[0];}).join(', ')||'(none)')+'. Walks leaves in order.',true);
+};
+document.getElementById('seed').onclick=function(){
+  root=new Node(true); ['apple','apricot','banana','cherry','date','elder','fig','grape','honey','kiwi'].forEach(function(k,i){insert(k,String(i+1));});
+  render(); say('Seeded 10 fruit keys — try inserting one more to force a split.',true);
+};
+document.getElementById('clr').onclick=function(){root=new Node(true);render();say('Cleared.',true);};
+render();
+</script></main></body></html>
