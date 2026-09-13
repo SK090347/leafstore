@@ -1,0 +1,49 @@
+{
+  "name": "leafstore",
+  "version": "1.0.0",
+  "description": "On-disk B+ tree key-value store in TypeScript — fixed pages, insert/get/range, single-file persistence",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "b-plus-tree",
+    "btree",
+    "key-value-store",
+    "database",
+    "typescript",
+    "systems",
+    "storage-engine"
+  ],
+  "author": "Sumit Kumar Ta <SK090347>",
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SK090347/leafstore.git"
+  },
+  "homepage": "https://github.com/SK090347/leafstore#readme",
+  "bugs": {
+    "url": "https://github.com/SK090347/leafstore/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "LICENSE-APACHE",
+    "NOTICE"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.9"
+  }
+}
