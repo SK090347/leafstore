@@ -1,5 +1,7 @@
 # leafstore
 
+**Live demo:** https://sk090347.github.io/leafstore/
+
 On-disk B+ tree KV in TypeScript. One file, fixed-size pages, `put` / `get` / ordered `range` — reopen the file and the keys are still there. Pair it with [lumen-kv](https://github.com/SK090347/lumen-kv) if you want the LSM side of the textbook too.
 
 [![CI](https://github.com/SK090347/leafstore/actions/workflows/ci.yml/badge.svg)](https://github.com/SK090347/leafstore/actions/workflows/ci.yml)
